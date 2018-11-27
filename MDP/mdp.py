@@ -38,7 +38,7 @@ class Binary_World(object):
 
 
         for state in range(self.n_states):
-            neighbours = ( state - self.grid_size, state - self.grid_size + 1, state + 1, state + self.grid_size + 1, state + self.grid_size, state + self.grid_size -1, state - 1, state - self.grid_size -1)
+            neighbours = (state - self.grid_size, state - self.grid_size + 1, state + 1, state + self.grid_size + 1, state + self.grid_size, state + self.grid_size -1, state - 1, state - self.grid_size -1)
             for n in neighbours:
                 if n in range(0,grid_size**2):
                     self.feature_matrix[state,neighbours.index(n)+1] = self.feature_matrix[n,0]
@@ -67,11 +67,11 @@ class Binary_World(object):
     def reward(self,state):
         blue_count = torch.sum(self.feature_matrix[state,:])
         if blue_count == 4:
-            return 2
-        if blue_count == 5:
-            return 0
-        else:
             return 1
+        if blue_count == 5:
+            return -1
+        else:
+            return 0
 
 
     def state_value(self, policy, epsilon=0.001, horizon=1000, reward_vector=None):
@@ -79,14 +79,15 @@ class Binary_World(object):
         if reward_vector is None:
             reward_vector = self.reward_vector
 
+        delta = 0
         for h in range(horizon):
-            delta = 0
+
             for s in range(self.n_states):
-                v_temp = v_func[s]
+                v_temp = v_func[s].item()
 
                 _, a = policy[s,:].max(0)
                 v_new = torch.sum(self.transition_probability[s,a.long(),:] @ (reward_vector + self.gamma * v_func))
-                delta = max(delta, abs(v_temp - v_new))
+                delta = max(delta, abs(v_temp - v_new.item()))
 
                 v_func[s] = v_new
 
@@ -96,19 +97,20 @@ class Binary_World(object):
 
         return v_func
 
-    def optimum_state_value(self, epsilon=0.001, horizon=1000, reward_vector = None):
+    def optimum_state_value(self, epsilon=0.001, horizon=1000, reward_vector=None):
         v_func = torch.zeros(self.n_states)
         if reward_vector is None:
             reward_vector = self.reward_vector
 
+        delta = 0
         for h in range(horizon):
-            delta = 0
+
             for s in range(self.n_states):
                 m = float("-inf")
                 for a in range(self.n_actions):
-                    m = max(m, (self.transition_probability[s,a,:] @ (reward_vector + self.gamma * v_func)))
+                    m = max(m, (self.transition_probability[s,a,:] @ (reward_vector + self.gamma * v_func)).item())
 
-                delta = max(delta, abs(v_func[s] - m))
+                delta = max(delta, abs(v_func[s].item() - m))
                 v_func[s] = m
             if delta < epsilon:
                 print("Breaking Horizon:{}".format(h))
@@ -116,7 +118,7 @@ class Binary_World(object):
 
         return v_func
 
-    def get_policy(self, epsilon=0.001, values=None , deterministic=True):
+    def get_policy(self, epsilon=0.001, values=None, deterministic=True):
         if values is None:
             v_func = self.optimum_state_value(epsilon=epsilon)
         else:
@@ -125,28 +127,19 @@ class Binary_World(object):
         policy = torch.zeros((self.n_states,self.n_actions))
         if deterministic is True:
             for s in range(self.n_states):
-                best_action_value = float("-inf")
-                action = None
+                action_values = torch.zeros(self.n_actions)
                 for a in range(self.n_actions):
-                    action_value = 0
-                    action_value += torch.sum(self.transition_probability[s,a,:] * (self.reward_vector + self.gamma * v_func))
-
+                    action_values[a] += torch.sum(self.transition_probability[s,a,:] * (self.reward_vector + self.gamma * v_func))
                     #for s_ in range(self.n_states):
                     #    action_value += self.transition_probability[s,a,s_] * (self.reward(s_) + self.gamma * v_func[s_])
 
-                    if best_action_value < action_value:
-                        best_action_value = action_value
-                        action = a
-                policy[s,action] = 1
+                _, best_action= torch.max(action_values,0)
+                policy[s,best_action.long()] = 1
 
         else:
             for s in range(self.n_states):
                 for a in range(self.n_actions):
-                    action_value = 0
-                    action_value += torch.sum(
-                        self.transition_probability[s, a, :] * (self.reward_vector + self.gamma * v_func))
-
-                    policy[s,a] = action_value
+                    policy[s,a] = torch.sum(self.transition_probability[s, a, :] * (self.reward_vector + self.gamma * v_func))
 
             policy = torch.exp(policy)
             for s in range(self.n_states):

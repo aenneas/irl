@@ -54,7 +54,7 @@ def find_expected_frequency(M, reward, trajectories):
     starting_states_freq = torch.bincount(trajectories[:,0,0].long(), minlength=M.n_states)
     starting_states_freq = starting_states_freq.float()
     starting_states_prob = starting_states_freq / n_trajectories
-    expected_freq = torch.zeros()
+    #expected_freq = torch.zeros()
 
     svf = starting_states_prob.float()
     svf_ = torch.zeros(M.n_states, dtype=torch.float)
@@ -125,16 +125,16 @@ experiments = list()
 rew_lin = torch.zeros(9)
 rew_lin[0] = 0.9
 rew_lin[1:] = 0.1
-M = mdp.Binary_World(8, 0, 0.9, prob_blue=0.4)
+M = mdp.Binary_World(8, 0, 0.9, prob_blue=0.6)
 optim_value_func = M.optimum_state_value()
 deterministic_policy = M.get_policy(values=optim_value_func)
-all_trajectories = M.generate_trajectories(n_trajectory=128, horizon=40, policy=deterministic_policy)
+all_trajectories = M.generate_trajectories(n_trajectory=128, horizon=10, policy=deterministic_policy)
 
 data = M.feature_matrix.unsqueeze(0)
 data = torch.tensor(data,requires_grad=True)
 print(M.reward_vector)
 
-for mdp_num in range(10):
+for mdp_num in range(50):
     print("Replication:{}".format(mdp_num))
     best_counter = 20
     for experiment in [128,64,32,16,8,4]:
@@ -142,8 +142,8 @@ for mdp_num in range(10):
         trajectories = all_trajectories[0:experiment,:,:]
         svf = state_visitation_frequencies(M,trajectories)
 
-        net = Net()
-        optimizer = torch.optim.Adam(net.parameters())
+        net = Standard_Maxent()
+        optimizer = torch.optim.Adagrad(net.parameters())
         for epoch in range(20):
             if best_counter == 0:
                 break
@@ -171,6 +171,6 @@ for mdp_num in range(10):
 
         experiments.append((mdp_num,experiment,best_evd,evd_current))
         print(net_out)
-with open('experiments_deep_binaryworld_h5_rep10.pkl', 'wb') as f:
+with open('experiments_linear_binaryworld_h10_rep50.pkl', 'wb') as f:
     pickle.dump(experiments, f)
 
