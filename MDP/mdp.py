@@ -62,6 +62,8 @@ class Binary_World(object):
             return True
         if action == -1 and (state_index in range(0, self.grid_size * (self.grid_size-1) + 1, self.grid_size)):
             return True
+        else:
+            return False
 
 
     def reward(self,state):
